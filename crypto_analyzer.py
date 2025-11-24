@@ -35,7 +35,7 @@ def get_crypto_data(coin_list: List[str]):
     return crypto_api_resp.json()
 
 
-def get_crypto_analysis_response(coins : List[str]):
+def get_crypto_analysis_response(coins : List[str]) -> CryptoAnalysisResponse:
 
     chat_prompt = ChatPromptTemplate.from_template(
         """
@@ -65,6 +65,6 @@ def get_crypto_analysis_response(coins : List[str]):
     return resp
 
 @app.post("/crypto/analysis", response_model=CryptoAnalysisResponse)
-def analyze_crypto(request: CryptoRequest):
+def analyze_crypto(request: CryptoRequest) :
 
     return get_crypto_analysis_response(request.coins)
