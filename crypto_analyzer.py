@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 from starlette import status
 from starlette.exceptions import HTTPException
 
-from models import CryptoAnalysisResponse
+from models import CryptoAnalysisResponse, CryptoRequest
 
 load_dotenv()
 
@@ -35,28 +35,36 @@ def get_crypto_data(coin_list: List[str]):
     return crypto_api_resp.json()
 
 
-chat_prompt = ChatPromptTemplate.from_template(
-    """
-    You are a CryptoAnalyst - AI, a professional cryptocurrency analyst
+def get_crypto_analysis_response(coins : List[str]):
 
-    You will be given recent market data for multiple cryptocurrencies (price, market cap, volume, 24h change)
+    chat_prompt = ChatPromptTemplate.from_template(
+        """
+        You are a CryptoAnalyst - AI, a professional cryptocurrency analyst
+    
+        You will be given recent market data for multiple cryptocurrencies (price, market cap, volume, 24h change)
+    
+        Here is the market Data:
+    
+        {market_data}
+    
+    
+    Rules:
+        - Return one analysis per cryptocurrency
+        - Provide 3 key_factors and 3 insights per coin
+        - Base your reasoning on given metrics (e.g price change %, market cap trend)
+        """
+    )
 
-    Here is the market Data:
+    llm = ChatOpenAI(model="meta-llama/llama-3.3-70b-instruct:free",
+                     base_url=OPENROUTER_URL, api_key=OPENROUTER_KEY).with_structured_output(CryptoAnalysisResponse)
 
-    {market_data}
+    response_chain = chat_prompt | llm  #LCEL = Langchain Expression Language
 
+    resp = response_chain.invoke({"market_data": json.dumps(get_crypto_data(coins))})
 
-Rules:
-    - Return one analysis per cryptocurrency
-    - Provide 3 key_factors and 3 insights per coin
-    - Base your reasoning on given metrics (e.g price change %, market cap trend)
-    """
-)
+    return resp
 
-llm = ChatOpenAI(model="meta-llama/llama-3.3-70b-instruct:free",
-                 base_url=OPENROUTER_URL, api_key=OPENROUTER_KEY).with_structured_output(CryptoAnalysisResponse)
+@app.post("/crypto/analysis", response_model=CryptoAnalysisResponse)
+def analyze_crypto(request: CryptoRequest):
 
-response_chain = chat_prompt | llm  #LCEL = Langchain Expression Language
-
-resp = response_chain.invoke({"market_data": json.dumps(get_crypto_data(["bitcoin", "ethereum"]))})
-print(resp)
+    return get_crypto_analysis_response(request.coins)
